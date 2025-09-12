@@ -67,13 +67,22 @@ function App() {
   const [monthIndex] = useState(8); // 0-based: 8 = September
 
   const [selectedDate, setSelectedDate] = useState(() => new Date(2025, 8, 1));
-  const [items, setItems] = useState([
-    // sample data
-    { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會' },
-    { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習' },
-    { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI' },
-    { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身' },
-  ]);
+  const [items, setItems] = useState(() => {
+    // 初次載入：嘗試從 localStorage 讀取，否則使用範例資料
+    try {
+      const raw = localStorage.getItem('scheduleItems');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return [
+      { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會' },
+      { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習' },
+      { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI' },
+      { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身' },
+    ];
+  });
 
   const [filter, setFilter] = useState(null); // null = all
   const [quickText, setQuickText] = useState('');
@@ -90,6 +99,13 @@ function App() {
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [editing, setEditing] = useState(null); // { id, text, category, time, open }
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+
+  // 當 items 有任何變更時，自動儲存到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('scheduleItems', JSON.stringify(items));
+    } catch (_) {}
+  }, [items]);
 
   const monthWeeks = useMemo(() => buildMonthMatrix(year, monthIndex), [year, monthIndex]);
   const selectedDateKey = useMemo(() => formatDateKey(selectedDate), [selectedDate]);
