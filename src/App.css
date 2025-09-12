@@ -153,8 +153,8 @@
 
 .corner-time {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: calc(16px + env(safe-area-inset-right, 0));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0));
   padding: 8px 10px;
   background: rgba(79,70,229,0.9);
   color: #fff;
@@ -351,6 +351,64 @@
 @media (max-width: 960px) {
   .main-layout { grid-template-columns: 1fr; }
   .calendar { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+}
+
+@media (max-width: 640px) {
+  .app-header { padding: 12px 14px; }
+  .app-header h1 { font-size: 18px; }
+
+  .toolbar { padding: 10px 14px; gap: 10px; }
+  .quick-add { flex: 1 1 100%; flex-wrap: wrap; gap: 8px; }
+  .quick-input { width: 100%; min-width: 0; }
+  .quick-time, .quick-category, .btn.add { height: 36px; }
+
+  .time-panel { width: min(320px, calc(100vw - 24px)); right: 12px; }
+  .time-panel.dial { width: min(360px, calc(100vw - 24px)); right: 12px; }
+  .dial-area { padding: 4px 0 0; }
+  .time-dial { width: 260px; height: 260px; }
+
+  .calendar { padding: 10px 14px 14px; min-width: 0; }
+  .calendar-header { margin: 4px 0 8px; }
+  .weekdays { gap: 4px; }
+  .weekday { font-size: 11px; }
+  .month-grid { grid-auto-rows: minmax(64px, 1fr); gap: 4px; }
+  .week-row { gap: 4px; }
+  .day-cell { padding: 6px; border-radius: 8px; }
+  .day-number { font-size: 11px; }
+  .dots { top: 4px; right: 6px; }
+  .add-bubble { left: 6px; bottom: 6px; }
+
+  .day-view { padding: 10px 14px 14px; }
+  .day-view-header { margin: 4px 0 8px; }
+
+  .schedule-list { gap: 8px; }
+  .schedule-item {
+    grid-template-columns: 8px 1fr auto;
+    grid-auto-rows: auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .schedule-item .dot { grid-column: 1; }
+  .schedule-item .time { grid-column: 2; font-size: 11px; }
+  .schedule-item .text { grid-column: 2; }
+  .schedule-item .actions { grid-column: 3; gap: 4px; }
+  .btn.icon { width: 30px; }
+  .edit-time { width: 64px; }
+  .edit-input { height: 30px; }
+  .edit-category { height: 30px; }
+}
+
+@media (max-width: 400px) {
+  .time-dial { width: 220px; height: 220px; }
+  .time-panel { width: min(300px, calc(100vw - 20px)); right: 10px; }
+  .time-panel.dial { width: min(320px, calc(100vw - 20px)); right: 10px; }
+
+  .toolbar { padding: 8px 10px; }
+  .filters { gap: 6px; }
+  .btn { height: 34px; padding: 0 10px; }
+
+  .month-grid { grid-auto-rows: minmax(56px, 1fr); }
+  .weekday { font-size: 10px; }
 }
 
 /* Preserve CRA demo styles if needed elsewhere */
