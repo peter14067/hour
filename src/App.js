@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import TodoList from './TodoList';
 
 const CATEGORIES = [
   { key: 'work', label: '工作', color: '#4f46e5' },
@@ -67,22 +68,13 @@ function App() {
   const [monthIndex] = useState(8); // 0-based: 8 = September
 
   const [selectedDate, setSelectedDate] = useState(() => new Date(2025, 8, 1));
-  const [items, setItems] = useState(() => {
-    // 初次載入：嘗試從 localStorage 讀取，否則使用範例資料
-    try {
-      const raw = localStorage.getItem('scheduleItems');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (_) {}
-    return [
-      { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會' },
-      { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習' },
-      { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI' },
-      { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身' },
-    ];
-  });
+  const [items, setItems] = useState([
+    // sample data
+    { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會', time: '09:00', hasTimeField: true },
+    { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習', time: '20:00', hasTimeField: true },
+    { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI', time: '14:30', hasTimeField: true },
+    { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身', time: '19:00', hasTimeField: true },
+  ]);
 
   const [filter, setFilter] = useState(null); // null = all
   const [quickText, setQuickText] = useState('');
@@ -99,13 +91,11 @@ function App() {
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [editing, setEditing] = useState(null); // { id, text, category, time, open }
   const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
-
-  // 當 items 有任何變更時，自動儲存到 localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('scheduleItems', JSON.stringify(items));
-    } catch (_) {}
-  }, [items]);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverDate, setDragOverDate] = useState(null);
+  const [todos, setTodos] = useState([]); // 待辦清單
+  const [isDragging, setIsDragging] = useState(false);
+  const [editingTimeField, setEditingTimeField] = useState(null); // { id, time }
 
   const monthWeeks = useMemo(() => buildMonthMatrix(year, monthIndex), [year, monthIndex]);
   const selectedDateKey = useMemo(() => formatDateKey(selectedDate), [selectedDate]);
@@ -151,23 +141,20 @@ function App() {
   function handleAddQuick() {
     const trimmed = quickText.trim();
     if (!trimmed) return;
-    const timePrefix = quickTime ? `${quickTime} ` : '';
+    
+    // 自動檢測時間和內容
+    const timeMatch = trimmed.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
+    const timePrefix = timeMatch ? `${timeMatch[1]} ` : '';
+    const content = timeMatch ? timeMatch[2] : trimmed;
+    
     const newItem = {
       id: Date.now(),
       date: selectedDateKey,
-      category: quickCategory,
-      text: `${timePrefix}${trimmed}`,
+      category: 'work', // 預設為工作類別
+      text: `${timePrefix}${content}`,
     };
     setItems(prev => [...prev, newItem]);
     setQuickText('');
-    setQuickTime('');
-    // update corner time display and persist
-    const saved = quickTime || (parseTimeFromText(trimmed) != null ? formatMinutesToTime(parseTimeFromText(trimmed)) : '');
-    setLastSavedTime(saved);
-    try {
-      localStorage.setItem('cornerTime', saved);
-    } catch (_) {}
-    setIsTimePickerOpen(false);
   }
 
   function extractTimeAndContent(text) {
@@ -215,12 +202,186 @@ function App() {
     return Array.from(set);
   }
 
+  // 拖拽处理函数
+  function handleDragStart(e, item) {
+    e.dataTransfer.effectAllowed = 'move';
+    const dragData = {
+      ...item,
+      source: 'timeaxis' // 標記來源為時間軸
+    };
+    e.dataTransfer.setData('text/plain', JSON.stringify(dragData));
+    setDraggedItem(item);
+    setIsDragging(true);
+    console.log('開始拖曳時間軸項目:', dragData); // 調試用
+  }
+
+  function handleDragOver(e, dateKey) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverDate(dateKey);
+    console.log('拖曳懸停日期:', dateKey); // 調試用
+  }
+
+  function handleDragLeave() {
+    setDragOverDate(null);
+  }
+
+  function handleDrop(e, targetDateKey) {
+    e.preventDefault();
+    
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      console.log('拖曳數據:', data); // 調試用
+      console.log('目標日期鍵:', targetDateKey); // 調試用
+      
+      if (data.source === 'todoList' && targetDateKey) {
+        // 從待辦清單拖到月曆 - 創建新的時間軸項目
+        const timePrefix = data.time ? `${data.time} ` : '';
+        const newItem = {
+          id: Date.now(),
+          date: targetDateKey,
+          category: data.category,
+          text: `${timePrefix}${data.text}`,
+          duration: 60, // 預設1小時
+          time: data.time || '', // 添加時間欄位
+          hasTimeField: true // 標記有時間欄位
+        };
+        
+        console.log('創建新項目:', newItem); // 調試用
+        
+        // 添加到時間軸項目
+        setItems(prev => {
+          const updated = [...prev, newItem];
+          console.log('更新後的項目列表:', updated); // 調試用
+          return updated;
+        });
+        
+        // 更新待辦事項狀態為已安排
+        setTodos(prev => prev.map(todo => 
+          todo.id === data.id 
+            ? { ...todo, status: 'scheduled', scheduledDate: targetDateKey }
+            : todo
+        ));
+        
+        console.log('拖曳完成，已添加到日期:', targetDateKey);
+        
+        // 自動切換到目標日期以顯示結果
+        const targetDate = new Date(targetDateKey);
+        setSelectedDate(targetDate);
+        
+        // 顯示成功提示
+        alert(`已將「${data.text}」安排到 ${targetDateKey}`);
+      } else if (data.source === 'timeaxis' && targetDateKey) {
+        // 從時間軸拖到月曆
+        setItems(prev => prev.map(item => 
+          item.id === data.id 
+            ? { ...item, date: targetDateKey }
+            : item
+        ));
+        console.log('已移動時間軸項目到日期:', targetDateKey);
+        
+        // 自動切換到目標日期以顯示結果
+        const targetDate = new Date(targetDateKey);
+        setSelectedDate(targetDate);
+      } else {
+        console.warn('拖曳處理失敗：', { data, targetDateKey });
+      }
+    } catch (error) {
+      console.error('拖拽處理錯誤:', error);
+      alert('拖曳失敗，請重試');
+    }
+    
+    setDraggedItem(null);
+    setDragOverDate(null);
+    setIsDragging(false);
+  }
+
+  function handleDragEnd() {
+    setDraggedItem(null);
+    setDragOverDate(null);
+    setIsDragging(false);
+  }
+
+  // 根據時間文字獲取時間範圍
+  function getTimeRangeFromTime(text) {
+    const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    if (!timeMatch) return null;
+    
+    const hour = parseInt(timeMatch[1], 10);
+    
+    if (hour >= 6 && hour < 14) return 'morning';
+    if (hour >= 14 && hour < 22) return 'afternoon';
+    return 'night';
+  }
+
+  function handleItemUpdate(itemId, updates) {
+    setItems(prev => prev.map(item => 
+      item.id === itemId 
+        ? { ...item, ...updates }
+        : item
+    ));
+  }
+
+  function handleItemCreate(item) {
+    const newItem = {
+      id: Date.now(),
+      date: selectedDateKey,
+      category: item.category || 'work',
+      text: item.text,
+      duration: item.duration || 60
+    };
+    setItems(prev => [...prev, newItem]);
+  }
+
+  // 待辦清單處理函數
+  function handleTodoCreate(todo) {
+    setTodos(prev => [...prev, todo]);
+  }
+
+  function handleTodoUpdate(todoId, updates) {
+    setTodos(prev => prev.map(todo => 
+      todo.id === todoId 
+        ? { ...todo, ...updates }
+        : todo
+    ));
+  }
+
+  function handleTodoDelete(todoId) {
+    setTodos(prev => prev.filter(todo => todo.id !== todoId));
+  }
+
+  // 時間欄位處理函數
+  function handleTimeFieldClick(item) {
+    setEditingTimeField({ id: item.id, time: item.time || '' });
+  }
+
+  function handleTimeFieldChange(itemId, newTime) {
+    setItems(prev => prev.map(item => 
+      item.id === itemId 
+        ? { ...item, time: newTime, text: newTime ? `${newTime} ${item.text.replace(/^\s*([01]?\d|2[0-3]):([0-5]\d)\s+/, '')}` : item.text }
+        : item
+    ));
+  }
+
+  function handleTimeFieldSave(itemId) {
+    if (editingTimeField && editingTimeField.id === itemId) {
+      handleTimeFieldChange(itemId, editingTimeField.time);
+      setEditingTimeField(null);
+    }
+  }
+
+  function handleTimeFieldCancel() {
+    setEditingTimeField(null);
+  }
+
+
   const monthTitle = `${year}/` + String(monthIndex + 1).padStart(2, '0');
 
   return (
     <div className={`app-root theme-${theme}`}>
       <header className="app-header">
-        <h1>我的作品集日曆</h1>
+        <h1>📅 我的日曆</h1>
+        <p className="app-subtitle">簡單管理你的待辦事項和行程</p>
       </header>
 
       <div className="toolbar">
@@ -228,33 +389,16 @@ function App() {
           <input
             className="quick-input"
             type="text"
-            placeholder="待辦事項快速新增，例如：09:00 與客戶開會"
+            placeholder="輸入待辦事項，例如：09:00 開會 或 買菜"
             value={quickText}
             onChange={(e) => setQuickText(e.target.value)}
             ref={quickInputRef}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddQuick()}
           />
-          <TimeScrollPicker
-            value={quickTime}
-            onChange={setQuickTime}
-            open={isTimePickerOpen}
-            onOpen={() => setIsTimePickerOpen(true)}
-            onClose={() => setIsTimePickerOpen(false)}
-            ariaLabel="幾點開始"
-          />
-          <select
-            className="quick-category"
-            value={quickCategory}
-            onChange={(e) => setQuickCategory(e.target.value)}
-          >
-            {CATEGORIES.map(c => (
-              <option key={c.key} value={c.key}>{c.label}</option>
-            ))}
-          </select>
           <button className="btn add" aria-label="新增" title="新增" onClick={handleAddQuick}>＋</button>
         </div>
 
         <div className="filters">
-          <span className="filter-label">篩選器：</span>
           <button
             className={`btn filter ${filter === null ? 'active' : ''}`}
             onClick={() => setFilter(null)}
@@ -272,16 +416,26 @@ function App() {
             >{c.label}</button>
           ))}
           <button
-            className="btn"
+            className="btn theme-toggle"
             onClick={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
             title="主題切換"
-          >{theme === 'dark' ? '淺色' : '深色'}</button>
+          >{theme === 'dark' ? '☀️' : '🌙'}</button>
         </div>
       </div>
 
       <main className="main-layout">
         <section className="calendar">
-          <div className="calendar-header">月曆（{monthTitle}）</div>
+          <div className="calendar-header">
+            <span>月曆（{monthTitle}）</span>
+            <div className="calendar-stats">
+              <span className="stat-item">
+                有安排：{monthWeeks.flat().filter(day => day && getCountForDateKey(formatDateKey(new Date(year, monthIndex, day))) > 0).length} 天
+              </span>
+              <span className="stat-item">
+                空閒：{monthWeeks.flat().filter(day => day && getCountForDateKey(formatDateKey(new Date(year, monthIndex, day))) === 0).length} 天
+              </span>
+            </div>
+          </div>
           <div className="weekdays">
             {['日','一','二','三','四','五','六'].map(d => (
               <div key={d} className="weekday">{d}</div>
@@ -298,32 +452,35 @@ function App() {
                   return (
                     <button
                       key={di}
-                      className={`day-cell ${isSelected ? 'selected' : ''} ${day ? '' : 'empty'} ${day && dateKey === todayKey ? 'today' : ''}`}
+                      className={`day-cell ${isSelected ? 'selected' : ''} ${day ? '' : 'empty'} ${day && dateKey === todayKey ? 'today' : ''} ${day && count === 0 ? 'empty-day' : ''} ${dragOverDate === dateKey ? 'drag-over' : ''}`}
                       onClick={() => handleClickDay(day)}
+                      onDragOver={day ? (e) => {
+                        e.preventDefault();
+                        handleDragOver(e, dateKey);
+                      } : undefined}
+                      onDragLeave={day ? handleDragLeave : undefined}
+                      onDrop={day ? (e) => {
+                        e.preventDefault();
+                        handleDrop(e, dateKey);
+                      } : undefined}
+                      onDragEnd={handleDragEnd}
                       disabled={!day}
                       title={day ? `${formatDateDisplay(new Date(year, monthIndex, day))}` : ''}
                     >
                       <span className="day-number">{day ?? ''}</span>
-                      {day && count > 0 && (
-                        <span className="dots" aria-label={`${count} 件待辦`} title={`${count} 件待辦`}>
-                          {cats.map((ck) => {
-                            const color = CATEGORIES.find(c => c.key === ck)?.color || '#94a3b8';
-                            return <span key={ck} className="dot small" style={{ backgroundColor: color }} />;
-                          })}
-                          {getCategoryKeysForDate(dateKey).length > 3 && <span className="more">＋</span>}
-                        </span>
-                      )}
                       {day && (
-                        <span
-                          className="add-bubble"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleClickDay(day);
-                            setTimeout(() => quickInputRef.current?.focus(), 0);
-                          }}
-                          title="快速新增"
-                          aria-label="快速新增"
-                        >＋</span>
+                        <div className="day-info">
+                          {count > 0 && (
+                            <span className="day-count" aria-label={`${count} 件待辦`} title={`${count} 件待辦`}>
+                              {count}
+                            </span>
+                          )}
+                          {count === 0 && (
+                            <span className="day-empty" title="無待辦事項">
+                              空
+                            </span>
+                          )}
+                        </div>
                       )}
                     </button>
                   );
@@ -333,79 +490,119 @@ function App() {
           </div>
         </section>
 
-        <aside className="day-view">
-          <div className="day-view-header">
-            <span>我的一天（{formatDateDisplay(new Date(selectedDateKey))}）</span>
-            <div className="day-view-header-actions">
-              <button className="btn share" onClick={shareSelectedDay}>分享</button>
+        <div className="right-panel">
+          <aside className="day-view">
+            <div className="day-view-header">
+              <span>我的一天（{formatDateDisplay(new Date(selectedDateKey))}）</span>
+              <div className="day-view-header-actions">
+                <button className="btn share" onClick={shareSelectedDay}>分享</button>
+              </div>
             </div>
+            {dayItems.length === 0 ? (
+              <div className="empty-day">尚無待辦，添加一條試試！</div>
+            ) : (
+              <ul className="schedule-list">
+                {dayItems.map(it => (
+                  <li 
+                    key={it.id} 
+                    className={`schedule-item ${editing?.id === it.id ? 'editing' : ''}`}
+                    draggable={editing?.id !== it.id}
+                    onDragStart={(e) => handleDragStart(e, it)}
+                    onDragEnd={handleDragEnd}
+                    onDoubleClick={() => beginEdit(it)}
+                  >
+                    <span
+                      className="dot"
+                      style={{ backgroundColor: CATEGORIES.find(c => c.key === it.category)?.color }}
+                    />
+                    <span className="text">{it.text}</span>
+                    {it.hasTimeField && (
+                      <div className="time-field">
+                        {editingTimeField?.id === it.id ? (
+                          <div className="time-field-editing">
+                            <TimeScrollPicker
+                              value={editingTimeField.time}
+                              onChange={(time) => setEditingTimeField(prev => ({ ...prev, time }))}
+                              open={true}
+                              onOpen={() => {}}
+                              onClose={() => {}}
+                              ariaLabel="選擇時間"
+                            />
+                            <div className="time-field-actions">
+                              <button className="btn small primary" onClick={() => handleTimeFieldSave(it.id)}>✓</button>
+                              <button className="btn small secondary" onClick={handleTimeFieldCancel}>✕</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="time-field-display" onClick={() => handleTimeFieldClick(it)}>
+                            <span className="time-icon">🕒</span>
+                            <span className="time-value">{it.time || 'HH:MM'}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="actions">
+                      <button className="btn icon" title="編輯" onClick={() => beginEdit(it)}>✎</button>
+                      <button className="btn icon" title="刪除" onClick={() => deleteItem(it.id)}>🗑</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            
+            {/* 內聯編輯表單 */}
+            {editing && (
+              <div className="edit-form">
+                <div className="edit-form-header">
+                  <span>編輯行程</span>
+                  <button className="btn icon" onClick={cancelEdit} title="取消">✕</button>
+                </div>
+                <div className="edit-form-content">
+                  <div className="edit-fields">
+                    <input
+                      className="edit-input"
+                      type="text"
+                      value={editing.text}
+                      onChange={(e) => setEditing(prev => ({ ...prev, text: e.target.value }))}
+                      placeholder="輸入行程內容"
+                      autoFocus
+                      onKeyPress={(e) => e.key === 'Enter' && saveEdit()}
+                      onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}
+                    />
+                    <select
+                      className="edit-category"
+                      value={editing.category}
+                      onChange={(e) => setEditing(prev => ({ ...prev, category: e.target.value }))}
+                    >
+                      {CATEGORIES.map(c => (
+                        <option key={c.key} value={c.key}>{c.label}</option>
+                      ))}
+                    </select>
+                    <TimeScrollPicker
+                      value={editing.time}
+                      onChange={(time) => setEditing(prev => ({ ...prev, time }))}
+                      open={editing.open}
+                      onOpen={() => setEditing(prev => ({ ...prev, open: true }))}
+                      onClose={() => setEditing(prev => ({ ...prev, open: false }))}
+                      ariaLabel="選擇時間"
+                    />
+                    <button className="btn save" onClick={saveEdit}>保存</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </aside>
+
+
+          <div className="todo-panel">
+            <TodoList
+              todos={todos}
+              onTodoCreate={handleTodoCreate}
+              onTodoUpdate={handleTodoUpdate}
+              onTodoDelete={handleTodoDelete}
+            />
           </div>
-          {dayItems.length === 0 ? (
-            <div className="empty-day">尚無待辦，添加一條試試！</div>
-          ) : (
-            <ul className="schedule-list">
-              {dayItems.map(it => (
-                <li key={it.id} className={`schedule-item ${editing?.id === it.id ? 'editing' : ''}`}>
-                  {editing?.id === it.id ? (
-                    <>
-                      <span
-                        className="dot"
-                        style={{ backgroundColor: CATEGORIES.find(c => c.key === editing.category)?.color }}
-                      />
-                      <div className="edit-time">
-                        <TimeScrollPicker
-                          value={editing.time}
-                          onChange={(v) => setEditing(ed => ({ ...ed, time: v }))}
-                          open={editing.open}
-                          onOpen={() => setEditing(ed => ({ ...ed, open: true }))}
-                          onClose={() => setEditing(ed => ({ ...ed, open: false }))}
-                          ariaLabel="編輯時間"
-                        />
-                      </div>
-                      <div className="edit-fields">
-                        <input
-                          className="edit-input"
-                          type="text"
-                          placeholder="待辦內容"
-                          value={editing.text}
-                          onChange={(e) => setEditing(ed => ({ ...ed, text: e.target.value }))}
-                        />
-                        <select
-                          className="edit-category"
-                          value={editing.category}
-                          onChange={(e) => setEditing(ed => ({ ...ed, category: e.target.value }))}
-                        >
-                          {CATEGORIES.map(c => (
-                            <option key={c.key} value={c.key}>{c.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="actions">
-                        <button className="btn save" onClick={saveEdit}>儲存</button>
-                        <button className="btn" onClick={cancelEdit}>取消</button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        className="dot"
-                        style={{ backgroundColor: CATEGORIES.find(c => c.key === it.category)?.color }}
-                      />
-                      <span className="time">
-                        {it.minutes !== 24 * 60 ? formatMinutesToTime(it.minutes) : '--:--'}
-                      </span>
-                      <span className="text">{it.text}</span>
-                      <div className="actions">
-                        <button className="btn icon" title="編輯" onClick={() => beginEdit(it)}>✎</button>
-                        <button className="btn icon" title="刪除" onClick={() => deleteItem(it.id)}>🗑</button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
+        </div>
       </main>
       <CornerTimeDisplay time={lastSavedTime} />
     </div>
@@ -416,8 +613,9 @@ export default App;
 
 function TimeScrollPicker({ value, onChange, open, onOpen, onClose, ariaLabel }) {
   const containerRef = useRef(null);
+  const hoursRef = useRef(null);
+  const minutesRef = useRef(null);
   const [internal, setInternal] = useState(() => parseValue(value));
-  const [mode, setMode] = useState('h'); // 'h' or 'm'
 
   useEffect(() => {
     setInternal(parseValue(value));
@@ -433,6 +631,60 @@ function TimeScrollPicker({ value, onChange, open, onOpen, onClose, ariaLabel })
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open, onClose]);
+
+  // Position the time panel using fixed positioning
+  useEffect(() => {
+    if (open && containerRef.current) {
+      const trigger = containerRef.current.querySelector('.time-trigger');
+      const panel = containerRef.current.querySelector('.time-panel');
+      
+      if (trigger && panel) {
+        const rect = trigger.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const panelHeight = 300; // max-height from CSS
+        
+        // Calculate position - move left to avoid blocking save button
+        let top = rect.bottom + 6;
+        let left = rect.left - 200; // Move 200px to the left
+        
+        // Adjust if panel would go off screen
+        if (top + panelHeight > viewportHeight) {
+          top = rect.top - panelHeight - 6;
+        }
+        
+        // Ensure panel doesn't go off the left side of screen
+        if (left < 8) {
+          left = 8;
+        }
+        
+        // If still too far right, adjust further left
+        if (left + 320 > window.innerWidth) {
+          left = window.innerWidth - 320 - 16;
+        }
+        
+        panel.style.position = 'fixed';
+        panel.style.top = `${Math.max(8, top)}px`;
+        panel.style.left = `${Math.max(8, left)}px`;
+        panel.style.right = 'auto';
+        panel.style.width = '320px';
+      }
+    }
+  }, [open]);
+
+  // 自動滾動到選中的時間
+  useEffect(() => {
+    if (open && hoursRef.current && minutesRef.current) {
+      const hourElement = hoursRef.current.querySelector(`[data-hour="${internal.h}"]`);
+      const minuteElement = minutesRef.current.querySelector(`[data-minute="${internal.m}"]`);
+      
+      if (hourElement) {
+        hourElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (minuteElement) {
+        minuteElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [open, internal.h, internal.m]);
 
   function parseValue(v) {
     if (!v) return { h: 9, m: 0 };
@@ -471,116 +723,72 @@ function TimeScrollPicker({ value, onChange, open, onOpen, onClose, ariaLabel })
     onChange?.('');
   }
 
-  // Build ticks for dial
+  // 生成更智能的時間選項
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minuteTicks = Array.from({ length: 60 }, (_, i) => i); // 0..59 every minute
-  const minuteLabelSteps = Array.from({ length: 12 }, (_, i) => i * 5); // labels at every 5 minutes
-
-  function polarToCartesian(cx, cy, radius, angleDeg) {
-    const rad = (angleDeg - 90) * Math.PI / 180;
-    return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
-  }
-
-  function angleFromPoint(cx, cy, x, y) {
-    const ang = Math.atan2(y - cy, x - cx) * 180 / Math.PI + 90;
-    return (ang + 360) % 360;
-  }
-
-  function handleDialClick(e) {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const x = e.clientX;
-    const y = e.clientY;
-    const ang = angleFromPoint(cx, cy, x, y);
-    if (mode === 'h') {
-      const idx = Math.round(ang / (360 / 24)) % 24;
-      handlePickHour(idx);
-      setMode('m');
-    } else {
-      const idx = Math.round(ang / (360 / 60)) % 60; // 1-min steps
-      handlePickMinute(idx);
-    }
-  }
-
-  function handAngleH(h) { return (h % 24) * (360 / 24); }
-  function handAngleM(m) { return (m % 60) * (360 / 60); }
+  const minutes = Array.from({ length: 60 }, (_, i) => i);
 
   return (
     <div className="time-picker" ref={containerRef}>
       <button
         type="button"
-        className="time-trigger quick-time"
+        className="time-trigger quick-time modern"
         aria-label={ariaLabel}
         onClick={() => (open ? onClose?.() : onOpen?.())}
       >
-        {value ? value : '選擇時間'}
-        <span className="chevron">▾</span>
+        <span className="time-icon">🕐</span>
+        <span className="time-text">{value ? value : '選擇時間'}</span>
+        <span className="chevron">⌄</span>
       </button>
       {open && (
-        <div className="time-panel dial">
-          <div className="panel-header tabs">
-            <button type="button" className={`tab ${mode === 'h' ? 'active' : ''}`} onClick={() => setMode('h')}>小時</button>
-            <button type="button" className={`tab ${mode === 'm' ? 'active' : ''}`} onClick={() => setMode('m')}>分鐘</button>
+        <div className="time-panel modern-scroll">
+          <div className="time-panel-header">
+            <span className="time-display">
+              {String(internal.h).padStart(2, '0')}:{String(internal.m).padStart(2, '0')}
+            </span>
           </div>
-          <div className="dial-area">
-            <svg className="time-dial" viewBox="0 0 200 200" onClick={handleDialClick} role="application" aria-label="時間圓盤">
-              <circle cx="100" cy="100" r="88" className="dial-ring" />
-              {/* hour ticks */}
-              {hours.map((h) => {
-                const angle = h * (360 / 24);
-                const p1 = polarToCartesian(100, 100, 78, angle);
-                const p2 = polarToCartesian(100, 100, 88, angle);
-                const isActive = internal.h === h && mode === 'h';
-                return (
-                  <line key={`h-${h}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} className={`tick hour ${isActive ? 'active' : ''}`} />
-                );
-              })}
-              {/* minute ticks (every 1 minute) */}
-              {minuteTicks.map((m) => {
-                const angle = (m / 60) * 360;
-                const p1 = polarToCartesian(100, 100, 64, angle);
-                const p2 = polarToCartesian(100, 100, 72, angle);
-                const isActive = internal.m === m && mode === 'm';
-                return (
-                  <line key={`m-${m}`} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} className={`tick minute ${isActive ? 'active' : ''}`} />
-                );
-              })}
-              {/* hands */}
-              {(() => {
-                const ah = handAngleH(internal.h);
-                const am = handAngleM(internal.m);
-                const hp = polarToCartesian(100, 100, 60, ah);
-                const mp = polarToCartesian(100, 100, 80, am);
-                return (
-                  <g className="hands">
-                    <line x1="100" y1="100" x2={hp.x} y2={hp.y} className={`hand hour ${mode === 'h' ? 'active' : ''}`} />
-                    <line x1="100" y1="100" x2={mp.x} y2={mp.y} className={`hand minute ${mode === 'm' ? 'active' : ''}`} />
-                    <circle cx="100" cy="100" r="3" className="pivot" />
-                  </g>
-                );
-              })()}
-              {/* labels */}
-              {hours.filter(h => h % 3 === 0).map((h) => {
-                const ang = h * (360 / 24);
-                const p = polarToCartesian(100, 100, 94, ang);
-                return (
-                  <text key={`hl-${h}`} x={p.x} y={p.y} className="label hour" textAnchor="middle" dominantBaseline="middle">{String(h).padStart(2,'0')}</text>
-                );
-              })}
-              {minuteLabelSteps.map((m) => {
-                const ang = (m / 60) * 360;
-                const p = polarToCartesian(100, 100, 50, ang);
-                return (
-                  <text key={`ml-${m}`} x={p.x} y={p.y} className="label minute" textAnchor="middle" dominantBaseline="middle">{String(m).padStart(2,'0')}</text>
-                );
-              })}
-            </svg>
+          <div className="scroll-container">
+            <div className="scroll-column">
+              <div className="scroll-header">小時</div>
+              <div className="scroll-list hours-scroll" ref={hoursRef}>
+                {hours.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    className={`scroll-item ${internal.h === h ? 'active' : ''}`}
+                    data-hour={h}
+                    onClick={() => handlePickHour(h)}
+                  >
+                    {String(h).padStart(2, '0')}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="scroll-column">
+              <div className="scroll-header">分鐘</div>
+              <div className="scroll-list minutes-scroll" ref={minutesRef}>
+                {minutes.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`scroll-item ${internal.m === m ? 'active' : ''}`}
+                    data-minute={m}
+                    onClick={() => handlePickMinute(m)}
+                  >
+                    {String(m).padStart(2, '0')}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <div className="panel-footer">
-            <button type="button" className="btn small" onClick={setNow}>現在</button>
-            <button type="button" className="btn small" onClick={clearTime}>清除</button>
+            <button type="button" className="btn small primary" onClick={setNow}>
+              <span className="btn-icon">⏰</span>
+              現在
+            </button>
+            <button type="button" className="btn small secondary" onClick={clearTime}>
+              <span className="btn-icon">🗑</span>
+              清除
+            </button>
           </div>
         </div>
       )}

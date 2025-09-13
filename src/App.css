@@ -1,4 +1,4 @@
-.app-root {
+ㄗㄗㄗ.app-root {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -88,7 +88,7 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
   z-index: 20;
 }
-.time-panel.dial { grid-template-columns: 1fr; width: 360px; }
+.time-panel.scroll { grid-template-columns: 1fr; width: 280px; }
 .time-panel .panel-header {
   grid-column: 1 / span 2;
   display: grid;
@@ -97,9 +97,6 @@
   font-size: 12px;
   padding: 2px 4px 0;
 }
-.time-panel.dial .panel-header.tabs { grid-column: 1; display: flex; gap: 6px; }
-.time-panel.dial .tab { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--card-border); background: var(--card); color: var(--fg); cursor: pointer; font-size: 12px; }
-.time-panel.dial .tab.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
 .time-panel .column { display: grid; gap: 6px; }
 .time-panel .hours-grid {
   grid-template-columns: repeat(4, 1fr);
@@ -128,28 +125,89 @@
   justify-content: space-between;
   gap: 8px;
 }
-.time-panel.dial .panel-footer { grid-column: 1; }
+.time-panel.scroll .panel-footer { grid-column: 1; }
 .btn.small {
   height: 30px;
   padding: 0 10px;
   font-size: 12px;
 }
 
-/* remove scroll fades for non-scrolling layout */
+/* Scrollable time picker styles */
+.scroll-container {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+}
 
-.dial-area { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px; }
-.time-dial { width: 320px; height: 320px; }
-.dial-ring { fill: transparent; stroke: var(--card-border); stroke-width: 1; }
-.tick { stroke: var(--card-border); stroke-width: 2; }
-.tick.hour { stroke-width: 3; opacity: 0.9; }
-.tick.minute { opacity: 0.8; }
-.tick.active { stroke: #4f46e5; }
-.hands .hand { stroke: #4f46e5; stroke-width: 2.5; }
-.hands .hand.hour { stroke-width: 3; opacity: 0.9; }
-.hands .hand.minute { opacity: 0.8; }
-.pivot { fill: #4f46e5; }
-.label { fill: var(--muted); font-size: 10px; user-select: none; }
-.label.hour { font-size: 11px; }
+.scroll-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.scroll-header {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.scroll-list {
+  height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--card);
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+
+.scroll-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-list::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 3px;
+}
+
+.scroll-list::-webkit-scrollbar-thumb:hover {
+  background: var(--fg);
+}
+
+.scroll-item {
+  width: 100%;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  transition: all 0.15s ease;
+}
+
+.scroll-item:hover {
+  background: var(--card-hover);
+}
+
+.scroll-item.active {
+  background: #4f46e5;
+  color: #fff;
+  font-weight: 600;
+}
+
+.scroll-item.active:hover {
+  background: #4338ca;
+}
 
 .corner-time {
   position: fixed;
@@ -194,6 +252,18 @@
   gap: 0px;
   min-height: 0;
   flex: 1 1 auto;
+}
+
+.right-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: 0px;
+  min-height: 0;
+}
+
+.todo-panel {
+  border-top: 1px solid var(--card-border);
+  min-height: 0;
 }
 
 .calendar {
@@ -273,6 +343,30 @@
   justify-content: space-between;
 }
 
+.day-view-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-mode-toggle {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.view-mode-toggle .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  height: 32px;
+}
+
+.view-mode-toggle .btn.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  color: #fff;
+}
+
 .empty-day {
   color: var(--muted);
   padding: 12px 0;
@@ -347,10 +441,78 @@
 .day-cell:hover .add-bubble { opacity: 1; }
 .day-cell.today .add-bubble { border-color: #22c55e66; }
 
+/* 拖拽样式 */
+.day-cell.drag-over {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: #4f46e5;
+  transform: scale(1.02);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3);
+}
+
+/* 从时间轴拖拽到日历的视觉反馈 */
+.day-cell.drag-over::after {
+  content: "拖拽到這裡";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(79, 70, 229, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  z-index: 10;
+  pointer-events: none;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* 拖拽时的全局样式 */
+.app-root.dragging {
+  cursor: grabbing;
+}
+
+.app-root.dragging * {
+  cursor: grabbing !important;
+}
+
+.schedule-item {
+  cursor: move;
+}
+
+.schedule-item:active {
+  opacity: 0.7;
+  transform: rotate(2deg);
+}
+
 /* Responsive */
 @media (max-width: 960px) {
   .main-layout { grid-template-columns: 1fr; }
   .calendar { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .right-panel { 
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+  }
+  .todo-panel { 
+    border-top: none; 
+    border-left: 1px solid var(--card-border); 
+  }
+}
+
+@media (max-width: 768px) {
+  .right-panel { 
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .todo-panel { 
+    border-left: none; 
+    border-top: 1px solid var(--card-border); 
+  }
 }
 
 /* Preserve CRA demo styles if needed elsewhere */
