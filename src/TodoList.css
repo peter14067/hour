@@ -307,20 +307,12 @@
   }
 }
 
-/* 滾動條樣式 */
+/* 隱藏滾動條但保持滾動功能 */
+.todo-list {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
 .todo-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.todo-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.todo-list::-webkit-scrollbar-thumb {
-  background: var(--card-border);
-  border-radius: 2px;
-}
-
-.todo-list::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  display: none; /* WebKit */
 }

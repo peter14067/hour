@@ -406,7 +406,10 @@ function App() {
 
   // 時間欄位處理函數
   function handleTimeFieldClick(item) {
-    setEditingTimeField({ id: item.id, time: item.time || '' });
+    // 從文字中提取現有時間，如果沒有則使用空字串
+    const timeMatch = item.text.match(/^\s*([01]?\d|2[0-3]):([0-5]\d)\s+/);
+    const existingTime = timeMatch ? `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}` : (item.time || '');
+    setEditingTimeField({ id: item.id, time: existingTime });
   }
 
   function handleTimeFieldChange(itemId, newTime) {
@@ -419,7 +422,20 @@ function App() {
 
   function handleTimeFieldSave(itemId) {
     if (editingTimeField && editingTimeField.id === itemId) {
-      handleTimeFieldChange(itemId, editingTimeField.time);
+      const newTime = editingTimeField.time;
+      setItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          // 更新時間欄位
+          const updatedItem = { ...item, time: newTime };
+          // 同時更新文字內容，移除舊的時間前綴並添加新的時間前綴
+          if (newTime) {
+            const textWithoutTime = item.text.replace(/^\s*([01]?\d|2[0-3]):([0-5]\d)\s+/, '');
+            updatedItem.text = `${newTime} ${textWithoutTime}`;
+          }
+          return updatedItem;
+        }
+        return item;
+      }));
       setEditingTimeField(null);
     }
   }
@@ -503,10 +519,11 @@ function App() {
                   const dateKey = day ? formatDateKey(new Date(year, monthIndex, day)) : '';
                   const count = day ? getCountForDateKey(dateKey) : 0;
                   const cats = day ? getCategoryKeysForDate(dateKey).slice(0, 3) : [];
+                  const hasEvents = day && count > 0;
                   return (
                     <button
                       key={di}
-                      className={`day-cell ${isSelected ? 'selected' : ''} ${day ? '' : 'empty'} ${day && dateKey === todayKey ? 'today' : ''} ${day && count === 0 ? 'empty-day' : ''} ${dragOverDate === dateKey ? 'drag-over' : ''}`}
+                      className={`day-cell ${isSelected ? 'selected' : ''} ${day ? '' : 'empty'} ${day && dateKey === todayKey ? 'today' : ''} ${hasEvents ? 'has-events' : ''} ${dragOverDate === dateKey ? 'drag-over' : ''}`}
                       onClick={() => handleClickDay(day)}
                       onDragOver={day ? (e) => {
                         e.preventDefault();
@@ -533,6 +550,26 @@ function App() {
                         {day && count === 0 && (
                           <div className="day-empty-indicator" title="無待辦事項">
                             空
+                          </div>
+                        )}
+                        {day && count > 0 && (
+                          <div className="day-category-indicators">
+                            {cats.map((cat, idx) => {
+                              const category = CATEGORIES.find(c => c.key === cat);
+                              return (
+                                <div
+                                  key={idx}
+                                  className="day-category-dot"
+                                  style={{ backgroundColor: category?.color }}
+                                  title={category?.label}
+                                />
+                              );
+                            })}
+                            {cats.length > 3 && (
+                              <div className="day-category-dot more" title={`還有 ${cats.length - 3} 個類別`}>
+                                +
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -570,31 +607,6 @@ function App() {
                       style={{ backgroundColor: CATEGORIES.find(c => c.key === it.category)?.color }}
                     />
                     <span className="text">{it.text}</span>
-                    {it.hasTimeField && (
-                      <div className="time-field">
-                        {editingTimeField?.id === it.id ? (
-                          <div className="time-field-editing">
-                            <TimeScrollPicker
-                              value={editingTimeField.time}
-                              onChange={(time) => setEditingTimeField(prev => ({ ...prev, time }))}
-                              open={true}
-                              onOpen={() => {}}
-                              onClose={() => {}}
-                              ariaLabel="選擇時間"
-                            />
-                            <div className="time-field-actions">
-                              <button className="btn small primary" onClick={() => handleTimeFieldSave(it.id)}>✓</button>
-                              <button className="btn small secondary" onClick={handleTimeFieldCancel}>✕</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="time-field-display" onClick={() => handleTimeFieldClick(it)}>
-                            <span className="time-icon">🕒</span>
-                            <span className="time-value">{it.time || 'HH:MM'}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                     <div className="actions">
                       <button className="btn icon" title="編輯" onClick={() => beginEdit(it)}>✎</button>
                       <button className="btn icon" title="刪除" onClick={() => deleteItem(it.id)}>🗑</button>
