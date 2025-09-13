@@ -68,13 +68,23 @@ function App() {
   const [monthIndex] = useState(8); // 0-based: 8 = September
 
   const [selectedDate, setSelectedDate] = useState(() => new Date(2025, 8, 1));
-  const [items, setItems] = useState([
-    // sample data
-    { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會', time: '09:00', hasTimeField: true },
-    { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習', time: '20:00', hasTimeField: true },
-    { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI', time: '14:30', hasTimeField: true },
-    { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身', time: '19:00', hasTimeField: true },
-  ]);
+  const [items, setItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('calendarItems');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('載入時間軸項目失敗:', error);
+    }
+    // 如果沒有儲存的資料，使用預設範例資料
+    return [
+      { id: 1, date: '2025-09-01', category: 'work', text: '09:00 團隊站會', time: '09:00', hasTimeField: true },
+      { id: 2, date: '2025-09-01', category: 'study', text: '20:00 React 練習', time: '20:00', hasTimeField: true },
+      { id: 3, date: '2025-09-05', category: 'project', text: '14:30 作品集日曆 UI', time: '14:30', hasTimeField: true },
+      { id: 4, date: '2025-09-10', category: 'life', text: '19:00 健身', time: '19:00', hasTimeField: true },
+    ];
+  });
 
   const [filter, setFilter] = useState(null); // null = all
   const [quickText, setQuickText] = useState('');
@@ -90,16 +100,60 @@ function App() {
   });
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   const [editing, setEditing] = useState(null); // { id, text, category, time, open }
-  const [theme, setTheme] = useState('dark'); // 'dark' | 'light'
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem('calendarTheme') || 'dark';
+    } catch (error) {
+      console.error('載入主題設定失敗:', error);
+      return 'dark';
+    }
+  });
   const [draggedItem, setDraggedItem] = useState(null);
   const [dragOverDate, setDragOverDate] = useState(null);
-  const [todos, setTodos] = useState([]); // 待辦清單
+  const [todos, setTodos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('calendarTodos');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (error) {
+      console.error('載入待辦清單失敗:', error);
+    }
+    return [];
+  });
   const [isDragging, setIsDragging] = useState(false);
   const [editingTimeField, setEditingTimeField] = useState(null); // { id, time }
 
   const monthWeeks = useMemo(() => buildMonthMatrix(year, monthIndex), [year, monthIndex]);
   const selectedDateKey = useMemo(() => formatDateKey(selectedDate), [selectedDate]);
   const todayKey = useMemo(() => formatDateKey(new Date()), []);
+
+  // 自動儲存時間軸項目到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('calendarItems', JSON.stringify(items));
+    } catch (error) {
+      console.error('儲存時間軸項目失敗:', error);
+    }
+  }, [items]);
+
+  // 自動儲存待辦清單到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('calendarTodos', JSON.stringify(todos));
+    } catch (error) {
+      console.error('儲存待辦清單失敗:', error);
+    }
+  }, [todos]);
+
+  // 自動儲存主題設定到 localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('calendarTheme', theme);
+    } catch (error) {
+      console.error('儲存主題設定失敗:', error);
+    }
+  }, [theme]);
 
   const dayItems = useMemo(() => {
     const list = items.filter(it => it.date === selectedDateKey && (!filter || it.category === filter));
@@ -467,21 +521,21 @@ function App() {
                       disabled={!day}
                       title={day ? `${formatDateDisplay(new Date(year, monthIndex, day))}` : ''}
                     >
-                      <span className="day-number">{day ?? ''}</span>
-                      {day && (
-                        <div className="day-info">
-                          {count > 0 && (
-                            <span className="day-count" aria-label={`${count} 件待辦`} title={`${count} 件待辦`}>
+                      <div className="day-content">
+                        <div className="day-number-row">
+                          <span className="day-number">{day ?? ''}</span>
+                          {day && count > 0 && (
+                            <span className="day-count-circle" aria-label={`${count} 件待辦`} title={`${count} 件待辦`}>
                               {count}
                             </span>
                           )}
-                          {count === 0 && (
-                            <span className="day-empty" title="無待辦事項">
-                              空
-                            </span>
-                          )}
                         </div>
-                      )}
+                        {day && count === 0 && (
+                          <div className="day-empty-indicator" title="無待辦事項">
+                            空
+                          </div>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
