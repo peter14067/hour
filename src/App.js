@@ -115,12 +115,7 @@ function App() {
     } catch (error) {
       console.error('載入時間軸項目失敗:', error);
     }
-    return [
-      { id: 1, date: '2025-01-15', category: 'work', text: '09:00 團隊站會', time: '09:00' },
-      { id: 2, date: '2025-01-15', category: 'study', text: '20:00 React 練習', time: '20:00' },
-      { id: 3, date: '2025-01-16', category: 'project', text: '14:30 作品集日曆 UI', time: '14:30' },
-      { id: 4, date: '2025-01-17', category: 'life', text: '19:00 健身', time: '19:00' },
-    ];
+    return [];
   });
 
   // localStorage 儲存
