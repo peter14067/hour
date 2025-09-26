@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import TodoList from './TodoList';
 
 const CATEGORIES = [
   { key: 'work', label: '工作', color: '#4f46e5' },
@@ -24,18 +23,31 @@ function formatDateDisplay(date) {
   return `${y}/${m}/${d}（${w}）`;
 }
 
-function parseTimeFromText(text) {
-  const match = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
-  if (!match) return null;
-  const [hh, mm] = [parseInt(match[1], 10), parseInt(match[2], 10)];
-  return hh * 60 + mm;
-}
 
-function formatMinutesToTime(total) {
-  const hh = String(Math.floor(total / 60)).padStart(2, '0');
-  const mm = String(total % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
-}
+// 簡單的 localStorage 工具函數
+const localStorageUtils = {
+  // 安全地保存數據
+  safeSetItem: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      console.error(`保存 ${key} 失敗:`, error);
+      return false;
+    }
+  },
+
+  // 安全地讀取數據
+  safeGetItem: (key, defaultValue = null) => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch (error) {
+      console.error(`讀取 ${key} 失敗:`, error);
+      return defaultValue;
+    }
+  }
+};
 
 function buildMonthMatrix(year, monthIndex) {
   const firstDay = new Date(year, monthIndex, 1);
@@ -93,54 +105,10 @@ function App() {
     return [];
   });
 
-  // 待辦事項狀態
-  const [todos, setTodos] = useState(() => {
-    try {
-      const saved = localStorage.getItem('calendarTodos');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('載入待辦清單失敗:', error);
-    }
-    return [];
-  });
+  // 時間軸項目狀態 (只使用記憶體暫存)
+  const [items, setItems] = useState([]);
 
-  // 時間軸項目狀態
-  const [items, setItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('calendarItems');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('載入時間軸項目失敗:', error);
-    }
-    return [
-      { id: 1, date: '2025-01-15', category: 'work', text: '09:00 團隊站會', time: '09:00' },
-      { id: 2, date: '2025-01-15', category: 'study', text: '20:00 React 練習', time: '20:00' },
-      { id: 3, date: '2025-01-16', category: 'project', text: '14:30 作品集日曆 UI', time: '14:30' },
-      { id: 4, date: '2025-01-17', category: 'life', text: '19:00 健身', time: '19:00' },
-    ];
-  });
-
-  // 自動儲存
-  useEffect(() => {
-    try {
-      localStorage.setItem('calendarTodos', JSON.stringify(todos));
-    } catch (error) {
-      console.error('儲存待辦清單失敗:', error);
-    }
-  }, [todos]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('calendarItems', JSON.stringify(items));
-    } catch (error) {
-      console.error('儲存時間軸項目失敗:', error);
-    }
-  }, [items]);
-
+  // localStorage 儲存
   useEffect(() => {
     try {
       localStorage.setItem('calendarTheme', theme);
@@ -156,6 +124,7 @@ function App() {
       console.error('儲存自定義種類失敗:', error);
     }
   }, [customCategories]);
+
 
   // 計算屬性
   const selectedDateKey = useMemo(() => formatDateKey(selectedDate), [selectedDate]);
@@ -259,6 +228,9 @@ function App() {
     setEditingCategory(null);
   };
 
+
+
+
   const getCountForDate = (dateKey) => {
     return items.filter(item => item.date === dateKey).length;
   };
@@ -352,6 +324,8 @@ function App() {
             </>
           )}
         </div>
+
+
 
         <div className="theme-toggle">
           <button
