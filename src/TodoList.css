@@ -110,107 +110,165 @@
   background: #4338ca;
 }
 
-.todo-list {
+.todo-cards-container {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 8px;
+}
+
+.todo-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 4px 0;
 }
 
 .empty-todos {
-  padding: 20px;
+  padding: 40px 20px;
   text-align: center;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
+  grid-column: 1 / -1;
 }
 
-.todo-item {
+.todo-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: move;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 120px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.todo-card:hover {
+  background: var(--card-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.todo-card.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg) scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.todo-card.scheduled {
+  border-left: 4px solid #16a34a;
+  background: linear-gradient(135deg, var(--card) 0%, rgba(22, 163, 74, 0.05) 100%);
+}
+
+.todo-card.unscheduled {
+  border-left: 4px solid #f59e0b;
+  background: linear-gradient(135deg, var(--card) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+/* 卡片頭部樣式 */
+.todo-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.todo-card-category {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 16px;
-  margin: 1px 0;
-  background: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  cursor: move;
-  transition: all 0.2s ease;
-  position: relative;
 }
 
-.todo-item:hover {
-  background: var(--card-hover);
-  transform: translateX(2px);
+.todo-card-category-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.todo-item.dragging {
-  opacity: 0.5;
-  transform: rotate(2deg);
+.todo-card-category-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.todo-item.scheduled {
-  border-left: 3px solid #16a34a;
+.todo-card-status {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: var(--card-border);
+  color: var(--muted);
+  white-space: nowrap;
+  font-weight: 500;
 }
 
-.todo-item.unscheduled {
-  border-left: 3px solid #f59e0b;
+.todo-card.scheduled .todo-card-status {
+  background: #16a34a;
+  color: #fff;
 }
 
-.todo-drag-handle {
+.todo-card.unscheduled .todo-card-status {
+  background: #f59e0b;
+  color: #fff;
+}
+
+/* 卡片內容樣式 */
+.todo-card-content {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.todo-card-text {
+  font-size: 14px;
+  color: var(--fg);
+  line-height: 1.5;
+  word-break: break-word;
+  font-weight: 400;
+}
+
+/* 卡片底部樣式 */
+.todo-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+}
+
+.todo-card-drag-handle {
   color: var(--muted);
   font-size: 12px;
   cursor: grab;
   user-select: none;
   opacity: 0.6;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
 }
 
-.todo-drag-handle:active {
+.todo-card-drag-handle:hover {
+  opacity: 1;
+  background: var(--card-hover);
+}
+
+.todo-card-drag-handle:active {
   cursor: grabbing;
 }
 
-.todo-category-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.todo-card-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
-.todo-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.todo-text {
-  font-size: 13px;
-  color: var(--fg);
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.todo-time {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 2px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
-
-.todo-status {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--card-border);
-  color: var(--muted);
-  white-space: nowrap;
-  margin-right: 8px;
-}
-
-.todo-item.scheduled .todo-status {
-  background: #16a34a;
-  color: #fff;
-}
-
-.todo-item.unscheduled .todo-status {
-  background: #f59e0b;
-  color: #fff;
+.todo-card:hover .todo-card-actions {
+  opacity: 1;
 }
 
 .todo-actions {
@@ -225,28 +283,30 @@
 }
 
 .btn-edit, .btn-delete {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13px;
   transition: all 0.2s ease;
 }
 
 .btn-edit:hover {
   background: #4f46e5;
   color: #fff;
+  transform: scale(1.1);
 }
 
 .btn-delete:hover {
   background: #dc2626;
   color: #fff;
+  transform: scale(1.1);
 }
 
 .todo-stats {
@@ -271,6 +331,18 @@
 }
 
 /* 響應式設計 */
+@media (max-width: 1024px) {
+  .todo-cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  
+  .todo-card {
+    min-height: 100px;
+    padding: 12px;
+  }
+}
+
 @media (max-width: 768px) {
   .todo-list-header {
     padding: 8px 12px 6px;
@@ -280,8 +352,26 @@
     padding: 6px 12px;
   }
   
-  .todo-item {
-    padding: 4px 12px;
+  .todo-cards-container {
+    padding: 6px;
+  }
+  
+  .todo-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .todo-card {
+    min-height: 90px;
+    padding: 12px;
+  }
+  
+  .todo-card-text {
+    font-size: 13px;
+  }
+  
+  .todo-card-category-label {
+    font-size: 11px;
   }
   
   .todo-stats {
@@ -289,7 +379,6 @@
     font-size: 9px;
     gap: 8px;
   }
-  
   
   .todo-input-group {
     gap: 6px;
@@ -305,14 +394,28 @@
     height: 28px;
     font-size: 12px;
   }
+  
+  .btn-edit, .btn-delete {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
 }
 
-/* 隱藏滾動條但保持滾動功能 */
-.todo-list {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* Internet Explorer 10+ */
+/* 滾動條樣式 */
+.todo-cards-container::-webkit-scrollbar {
+  width: 4px;
 }
 
-.todo-list::-webkit-scrollbar {
-  display: none; /* WebKit */
+.todo-cards-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.todo-cards-container::-webkit-scrollbar-thumb {
+  background: var(--card-border);
+  border-radius: 2px;
+}
+
+.todo-cards-container::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }

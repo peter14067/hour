@@ -127,53 +127,64 @@ function TodoList({ todos, onTodoUpdate, onTodoCreate, onTodoDelete }) {
         </div>
       </div>
 
-      <div className="todo-list">
+      <div className="todo-cards-container">
         {filteredTodos.length === 0 ? (
           <div className="empty-todos">
             尚無待辦事項
           </div>
         ) : (
-          filteredTodos.map(todo => {
-            const category = CATEGORIES.find(c => c.key === todo.category);
-            
-            return (
-              <div
-                key={todo.id}
-                className={`todo-item ${todo.status} ${draggedTodo?.id === todo.id ? 'dragging' : ''}`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, todo)}
-                onDragEnd={handleDragEnd}
-              >
-                <div className="todo-drag-handle">⋮⋮</div>
-                <div 
-                  className="todo-category-dot"
-                  style={{ backgroundColor: category?.color || '#94a3b8' }}
-                />
-                <div className="todo-content">
-                  <div className="todo-text">{todo.text}</div>
+          <div className="todo-cards-grid">
+            {filteredTodos.map(todo => {
+              const category = CATEGORIES.find(c => c.key === todo.category);
+              
+              return (
+                <div
+                  key={todo.id}
+                  className={`todo-card ${todo.status} ${draggedTodo?.id === todo.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, todo)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="todo-card-header">
+                    <div className="todo-card-category">
+                      <div 
+                        className="todo-card-category-dot"
+                        style={{ backgroundColor: category?.color || '#94a3b8' }}
+                      />
+                      <span className="todo-card-category-label">{category?.label || '未分類'}</span>
+                    </div>
+                    <div className="todo-card-status">
+                      {todo.status === 'scheduled' ? '已安排' : '未排程'}
+                    </div>
+                  </div>
+                  
+                  <div className="todo-card-content">
+                    <div className="todo-card-text">{todo.text}</div>
+                  </div>
+                  
+                  <div className="todo-card-footer">
+                    <div className="todo-card-drag-handle">⋮⋮</div>
+                    <div className="todo-card-actions">
+                      <button 
+                        className="btn-edit"
+                        onClick={() => handleEditStart(todo)}
+                        title="編輯"
+                      >
+                        ✎
+                      </button>
+                      <button 
+                        className="btn-delete"
+                        onClick={() => onTodoDelete(todo.id)}
+                        title="刪除"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="todo-status">
-                  {todo.status === 'scheduled' ? '已安排' : '未排程'}
-                </div>
-                <div className="todo-actions">
-                  <button 
-                    className="btn-edit"
-                    onClick={() => handleEditStart(todo)}
-                    title="編輯"
-                  >
-                    ✎
-                  </button>
-                  <button 
-                    className="btn-delete"
-                    onClick={() => onTodoDelete(todo.id)}
-                    title="刪除"
-                  >
-                    🗑
-                  </button>
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
